@@ -16,8 +16,7 @@ import org.esa.beam.jai.ResolutionLevel;
 import org.esa.beam.jai.SingleBandedOpImage;
 
 import javax.media.jai.PlanarImage;
-import java.awt.Dimension;
-import java.awt.Rectangle;
+import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferUShort;
@@ -26,6 +25,11 @@ import java.awt.image.WritableRaster;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author Norman Fomferra
@@ -44,42 +48,92 @@ public class Sentinel2ProductReader extends AbstractProductReader {
     int tileHeight;
     int numResolutions;
 
+    private static class BandInfo {
+        File file;
+        int bandIndex;
+        int width;
+        int height;
+        int tileWidth;
+        int tileHeight;
+        int numResolutions;
+    }
+
     @Override
     protected Product readProductNodesImpl() throws IOException {
         final String s = getInput().toString();
 
-        final File file = new File(s);
+        final File file0 = new File(s);
+        final File dir = file0.getParentFile();
 
-        final S2FileNameInfo fileNameInfo = S2FileNameInfo.create(file.getName());
-        if (fileNameInfo == null) {
-             throw new IOException();
+        final S2FileNameInfo fni0 = S2FileNameInfo.create(file0.getName());
+        if (fni0 == null) {
+            throw new IOException();
         }
 
-        final File parentFile = file.getParentFile();
-        if (parentFile != null) {
-            parentFile.list(new FilenameFilter() {
+        final Map<Integer, BandInfo> fileMap = new HashMap<Integer, BandInfo>();
+        if (dir != null) {
+            File[] files = dir.listFiles(new FilenameFilter() {
                 @Override
                 public boolean accept(File dir, String name) {
                     return name.endsWith(Sentinel2ProductReaderPlugIn.JP2_EXT);
                 }
             });
-
+            if (files != null) {
+                for (File file : files) {
+                    int bandIndex = fni0.getBand(file.getName());
+                    if (bandIndex >= 0) {
+                        final jopj_Img img = JP2LIB.jopj_open_img(file.getPath(), 0);
+                        if (img != null) {
+                            final jopj_ImgInfo imgInfo = JP2LIB.jopj_get_img_info(img);
+                            if (imgInfo != null) {
+                                BandInfo bandInfo = new BandInfo();
+                                bandInfo.file = file;
+                                bandInfo.bandIndex = bandIndex;
+                                bandInfo.width = imgInfo.width;
+                                bandInfo.height = imgInfo.height;
+                                bandInfo.tileWidth = imgInfo.tile_width;
+                                bandInfo.tileHeight = imgInfo.tile_height;
+                                bandInfo.numResolutions = imgInfo.num_resolutions_max;
+                                JP2LIB.jopj_dispose_img_info(imgInfo);
+                                JP2LIB.jopj_dispose_img(img);
+                                fileMap.put(bandIndex, bandInfo);
+                            } else {
+                                JP2LIB.jopj_dispose_img(img);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        final jopj_Img img = JP2LIB.jopj_open_img(file.getPath(), 0);
-        final jopj_ImgInfo imgInfo = JP2LIB.jopj_get_img_info(img);
-        width = imgInfo.width;
-        height = imgInfo.height;
-        tileWidth = imgInfo.tile_width;
-        tileHeight= imgInfo.tile_height;
-        numResolutions = imgInfo.num_resolutions_max;
-        JP2LIB.jopj_dispose_img_info(imgInfo);
-        JP2LIB.jopj_dispose_img(img);
+        final ArrayList<Integer> bandIndexes = new ArrayList<Integer>(fileMap.keySet());
+        Collections.sort(bandIndexes);
 
-        final Product product = new Product(file.getName(), "S2L1C", width, height);
-        final Band band = product.addBand("data", ProductData.TYPE_UINT16);
+        final Product product = new Product(dir != null ? dir.getName() : "S2L1C", "S2L1C", width, height);
 
-        band.setSourceImage(new DefaultMultiLevelImage(new Jp2MultiLevelSource(file)));
+        try {
+            product.setStartTime(ProductData.UTC.parse(fni0.start, "yyyyMMddHHmmss"));
+        } catch (ParseException e) {
+            // warn
+        }
+
+        try {
+            product.setEndTime(ProductData.UTC.parse(fni0.stop, "yyyyMMddHHmmss"));
+        } catch (ParseException e) {
+            // warn
+        }
+
+        for (Integer bandIndex : bandIndexes) {
+            final BandInfo bandInfo = fileMap.get(bandIndex);
+            width = Math.max(width, bandInfo.width);
+            height = Math.max(height, bandInfo.height);
+            tileWidth = Math.max(tileWidth, bandInfo.tileWidth);
+            tileHeight = Math.max(tileHeight, bandInfo.tileHeight);
+            numResolutions = Math.max(numResolutions, bandInfo.numResolutions);
+            final Band band = product.addBand("radiance_" + bandIndex, ProductData.TYPE_UINT16);
+            band.setSpectralBandIndex(bandIndex);
+            band.setSourceImage(new DefaultMultiLevelImage(new Jp2MultiLevelSource(bandInfo.file)));
+        }
 
         return product;
     }

@@ -1,0 +1,31 @@
+<module>
+    <manifestVersion>1.0.0</manifestVersion>
+    <symbolicName>sentinel-2-msi-reader</symbolicName>
+    <version>0.1</version>
+    <name>Sentinel-2 MSI L1B/L1C Reader</name>
+
+    <dependency>
+        <module>beam-core</module>
+    </dependency>
+    <dependency>
+        <module>beam-visat-rcp</module>
+        <optional>true</optional>
+    </dependency>
+
+    <categories>Reader,Sentinel</categories>
+
+    <extension point="beam-ui:actions">
+        <action>
+            <id>importSentinel2Product</id>
+            <helpId>importSentinel2Product</helpId>
+            <class>org.esa.beam.visat.actions.ProductImportAction</class>
+            <formatName>SENTINEL-2-MSI</formatName>
+            <useAllFileFilter>true</useAllFileFilter>
+        </action>
+    </extension>
+
+    <extension point="beam-core:rgbProfiles">
+        <!-- todo -->
+    </extension>
+
+</module>

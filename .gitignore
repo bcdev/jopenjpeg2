@@ -1,6 +1,10 @@
-*.class
+target
 
-# Package Files #
-*.jar
-*.war
-*.ear
+.idea
+*.iml
+# Microsoft Visual Studio
+*.sdf
+*.opensdf
+*.suo
+msvc/Debug
+msvc/Release

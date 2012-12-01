@@ -1,11 +1,11 @@
-package jopenjpeg2;
+package jopenjpeg2.jna;
 
+import jopenjpeg2.jna.Jopenjpeg2Library;
+import jopenjpeg2.jna.jopj_Img;
+import jopenjpeg2.jna.jopj_ImgInfo;
 import org.junit.Test;
 
-import java.io.BufferedOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -14,13 +14,14 @@ import static org.junit.Assert.assertNotNull;
  * @author Norman Fomferra
  */
 public class Jopenjpeg2LibraryTest {
+    // On Norman's notebook -Dsentinel2.testdataset=C:\Users\Norman\BC\EOData\S2_Simulated_Test_Data
+    public static final File F = new File(System.getProperty("sentinel2.testdataset"),
+            "IMG_GPPL1C_054_20091210235100_20091210235130_01_000000_15SVD.jp2");
 
-    public static final String F = "C:\\EOData\\S2_Simulated_Test_Data\\IMG_GPPL1C_054_20091210235100_20091210235130_01_000000_15SVD.jp2";
-
-    @Test
+    //@Test
     public void testDecodeRegion() throws Exception {
         Jopenjpeg2Library lib = Jopenjpeg2Library.INSTANCE;
-        jopj_Img img = lib.jopj_open_img(F, 0);
+        jopj_Img img = lib.jopj_open_img(F.getPath(), 0);
         assertNotNull(img);
         jopj_ImgInfo img_info = lib.jopj_get_img_info(img);
         assertNotNull(img_info);
@@ -48,7 +49,7 @@ public class Jopenjpeg2LibraryTest {
                 final String region = String.format("%d_%d_%d_%d", x0, y0, w, h);
 
                 long t0 = System.currentTimeMillis();
-                ok = lib.jopj_read_img_region_data(F, 0, 0, x0, y0, w, h, tile_data);
+                ok = lib.jopj_read_img_region_data(F.getPath(), 0, 0, x0, y0, w, h, tile_data);
                 //ok = lib.jopj_read_img_region_data(img, 0, 0, 0, 0, 0, tile_data);
                 if (ok) {
                     long t1 = System.currentTimeMillis();
@@ -76,7 +77,7 @@ public class Jopenjpeg2LibraryTest {
 
     private void testDecodeTile(int res) throws IOException {
         Jopenjpeg2Library lib = Jopenjpeg2Library.INSTANCE;
-        jopj_Img img = lib.jopj_open_img(F, res);
+        jopj_Img img = lib.jopj_open_img(F.getPath(), res);
         assertNotNull(img);
         jopj_ImgInfo img_info = lib.jopj_get_img_info(img);
         assertNotNull(img_info);
@@ -106,7 +107,7 @@ public class Jopenjpeg2LibraryTest {
             long t1 = System.currentTimeMillis();
             long dt = t1 - t0;
             System.out.printf("Tile %d-%d decoded in %d ms (%d pixels)\n", res, tileIndex, dt, w * h);
-            writePgm(String.format("images/tile-%d-%d.pgm", res, tileIndex), w, h, tile_data);
+            //writePgm(String.format("images/tile-%d-%d.pgm", res, tileIndex), w, h, tile_data);
         }
 
         lib.jopj_dispose_img_info(img_info);

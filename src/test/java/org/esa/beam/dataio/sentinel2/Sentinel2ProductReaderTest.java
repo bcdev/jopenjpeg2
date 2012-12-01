@@ -1,6 +1,6 @@
 package org.esa.beam.dataio.sentinel2;
 
-import jopenjpeg2.Jopenjpeg2LibraryTest;
+import jopenjpeg2.jna.Jopenjpeg2LibraryTest;
 import org.esa.beam.framework.dataio.ProductReader;
 import org.esa.beam.framework.datamodel.Band;
 import org.esa.beam.framework.datamodel.Product;
@@ -8,9 +8,9 @@ import org.junit.Test;
 
 import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
-import java.io.FileInputStream;
 
 import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 /**
  * @author Norman Fomferra
@@ -25,7 +25,8 @@ public class Sentinel2ProductReaderTest {
         assertNotNull(product);
         assertEquals(10960, product.getSceneRasterWidth());
         assertEquals(10960, product.getSceneRasterHeight());
-        final Band band = product.getBand("data");
+        assertEquals(6, product.getNumBands());
+        final Band band = product.getBand("radiance_1");
         assertNotNull(band);
 
         final int[] pixels = new int[16 * 16];

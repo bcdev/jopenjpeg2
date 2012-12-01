@@ -1,4 +1,4 @@
-package jopenjpeg2;
+package jopenjpeg2.jna;
 
 import com.sun.jna.*;
 

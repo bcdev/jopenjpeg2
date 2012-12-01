@@ -5,15 +5,14 @@ import com.bc.ceres.glevel.MultiLevelModel;
 import com.bc.ceres.glevel.support.AbstractMultiLevelSource;
 import com.bc.ceres.glevel.support.DefaultMultiLevelImage;
 import com.bc.ceres.glevel.support.DefaultMultiLevelModel;
-import jopenjpeg2.Jopenjpeg2Library;
-import jopenjpeg2.jopj_Img;
-import jopenjpeg2.jopj_ImgInfo;
+import jopenjpeg2.Jp2Image;
 import org.esa.beam.framework.dataio.AbstractProductReader;
 import org.esa.beam.framework.datamodel.Band;
 import org.esa.beam.framework.datamodel.Product;
 import org.esa.beam.framework.datamodel.ProductData;
 import org.esa.beam.jai.ResolutionLevel;
 import org.esa.beam.jai.SingleBandedOpImage;
+import org.esa.beam.util.logging.BeamLogManager;
 
 import javax.media.jai.PlanarImage;
 import java.awt.*;
@@ -36,8 +35,6 @@ import java.util.Map;
  */
 public class Sentinel2ProductReader extends AbstractProductReader {
 
-    public static final Jopenjpeg2Library JP2LIB = Jopenjpeg2Library.INSTANCE;
-
     Sentinel2ProductReader(Sentinel2ProductReaderPlugIn readerPlugIn) {
         super(readerPlugIn);
     }
@@ -51,11 +48,7 @@ public class Sentinel2ProductReader extends AbstractProductReader {
     private static class BandInfo {
         File file;
         int bandIndex;
-        int width;
-        int height;
-        int tileWidth;
-        int tileHeight;
-        int numResolutions;
+        Jp2Image.Layout imageLayout;
     }
 
     @Override
@@ -82,24 +75,15 @@ public class Sentinel2ProductReader extends AbstractProductReader {
                 for (File file : files) {
                     int bandIndex = fni0.getBand(file.getName());
                     if (bandIndex >= 0) {
-                        final jopj_Img img = JP2LIB.jopj_open_img(file.getPath(), 0);
-                        if (img != null) {
-                            final jopj_ImgInfo imgInfo = JP2LIB.jopj_get_img_info(img);
-                            if (imgInfo != null) {
-                                BandInfo bandInfo = new BandInfo();
-                                bandInfo.file = file;
-                                bandInfo.bandIndex = bandIndex;
-                                bandInfo.width = imgInfo.width;
-                                bandInfo.height = imgInfo.height;
-                                bandInfo.tileWidth = imgInfo.tile_width;
-                                bandInfo.tileHeight = imgInfo.tile_height;
-                                bandInfo.numResolutions = imgInfo.num_resolutions_max;
-                                JP2LIB.jopj_dispose_img_info(imgInfo);
-                                JP2LIB.jopj_dispose_img(img);
-                                fileMap.put(bandIndex, bandInfo);
-                            } else {
-                                JP2LIB.jopj_dispose_img(img);
-                            }
+                        try {
+                            Jp2Image.Layout imageLayout = Jp2Image.getLayout(file);
+                            BandInfo bandInfo = new BandInfo();
+                            bandInfo.file = file;
+                            bandInfo.bandIndex = bandIndex;
+                            bandInfo.imageLayout = imageLayout;
+                            fileMap.put(bandIndex, bandInfo);
+                        } catch (IOException e) {
+                            BeamLogManager.getSystemLogger().warning(e.getMessage());
                         }
                     }
                 }
@@ -108,6 +92,19 @@ public class Sentinel2ProductReader extends AbstractProductReader {
 
         final ArrayList<Integer> bandIndexes = new ArrayList<Integer>(fileMap.keySet());
         Collections.sort(bandIndexes);
+
+        if (bandIndexes.isEmpty()) {
+            throw new IOException("No valid bands found.");
+        }
+
+        for (Integer bandIndex : bandIndexes) {
+            final BandInfo bandInfo = fileMap.get(bandIndex);
+            width = Math.max(width, bandInfo.imageLayout.width);
+            height = Math.max(height, bandInfo.imageLayout.height);
+            tileWidth = Math.max(tileWidth, bandInfo.imageLayout.tileWidth);
+            tileHeight = Math.max(tileHeight, bandInfo.imageLayout.tileHeight);
+            numResolutions = Math.max(numResolutions, bandInfo.imageLayout.numResolutions);
+        }
 
         final Product product = new Product(dir != null ? dir.getName() : "S2L1C", "S2L1C", width, height);
 
@@ -125,14 +122,9 @@ public class Sentinel2ProductReader extends AbstractProductReader {
 
         for (Integer bandIndex : bandIndexes) {
             final BandInfo bandInfo = fileMap.get(bandIndex);
-            width = Math.max(width, bandInfo.width);
-            height = Math.max(height, bandInfo.height);
-            tileWidth = Math.max(tileWidth, bandInfo.tileWidth);
-            tileHeight = Math.max(tileHeight, bandInfo.tileHeight);
-            numResolutions = Math.max(numResolutions, bandInfo.numResolutions);
             final Band band = product.addBand("radiance_" + bandIndex, ProductData.TYPE_UINT16);
             band.setSpectralBandIndex(bandIndex);
-            band.setSourceImage(new DefaultMultiLevelImage(new Jp2MultiLevelSource(bandInfo.file)));
+            band.setSourceImage(new DefaultMultiLevelImage(new Jp2MultiLevelSource(bandInfo)));
         }
 
         return product;
@@ -152,31 +144,31 @@ public class Sentinel2ProductReader extends AbstractProductReader {
     }
 
     private class Jp2MultiLevelSource extends AbstractMultiLevelSource {
-        private final File file;
+        final BandInfo bandInfo;
 
-        public Jp2MultiLevelSource(File file) {
+        public Jp2MultiLevelSource(BandInfo bandInfo) {
             super(createImageModel());
-            this.file = file;
+            this.bandInfo = bandInfo;
         }
 
         @Override
         protected RenderedImage createImage(int res) {
-            return new Jp2OpImage(file, getModel(), res);
+            return new Jp2OpImage(bandInfo, getModel(), res);
         }
     }
 
     private class Jp2OpImage extends SingleBandedOpImage {
-        private final File file;
-        private jopj_Img img;
+        private final BandInfo bandInfo;
+        private Jp2Image jp2Image;
 
-        public Jp2OpImage(File file, MultiLevelModel imageModel, int res) {
+        public Jp2OpImage(BandInfo bandInfo, MultiLevelModel imageModel, int res) {
             super(DataBuffer.TYPE_USHORT,
                   Sentinel2ProductReader.this.width,
                   Sentinel2ProductReader.this.height,
                   getTileDim(res),
                   null,
                   ResolutionLevel.create(imageModel, res));
-            this.file = file;
+            this.bandInfo = bandInfo;
         }
 
         @Override
@@ -184,29 +176,28 @@ public class Sentinel2ProductReader extends AbstractProductReader {
             DataBufferUShort dbs = (DataBufferUShort) dest.getDataBuffer();
             final short[] tileData = dbs.getData();
 
-            if (img == null) {
-                img = JP2LIB.jopj_open_img(file.getPath(), getLevel());
-                if (img == null) {
-                    throw new RuntimeException(String.format("Failed to open image '%s'", file));
+            if (jp2Image == null) {
+                try {
+                    jp2Image = Jp2Image.open(bandInfo.file, getLevel());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
             }
 
             final int tileX = destRect.x / this.getTileWidth();
             final int tileY = destRect.y / this.getTileHeight();
-            final int tileIndex = this.getNumXTiles() * tileY + tileX;
-            if (!JP2LIB.jopj_read_img_tile_data(img, 0, tileIndex, tileData)) {
-                JP2LIB.jopj_dispose_img(img);
-                img = null;
-                throw new RuntimeException(String.format("Failed to read tile (%d,%d)", tileX, tileY));
+            try {
+                jp2Image.readTileData(0, tileX, tileY, tileData);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
         }
 
         @Override
         public synchronized void dispose() {
             super.dispose();
-            if (img != null) {
-                JP2LIB.jopj_dispose_img(img);
-                img = null;
+            if (jp2Image != null) {
+                jp2Image.dispose();
             }
         }
     }

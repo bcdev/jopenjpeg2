@@ -1,6 +1,6 @@
 package org.esa.beam.dataio.sentinel2;
 
-import jopenjpeg2.jna.Jopenjpeg2LibraryTest;
+import jopenjpeg2.jna.Jopenjpeg2LibTest;
 import org.esa.beam.framework.dataio.ProductReader;
 import org.esa.beam.framework.datamodel.Band;
 import org.esa.beam.framework.datamodel.Product;
@@ -21,7 +21,7 @@ public class Sentinel2ProductReaderTest {
     public void testReader() throws Exception {
         final Sentinel2ProductReaderPlugIn sentinel2ProductReaderPlugIn = new Sentinel2ProductReaderPlugIn();
         final ProductReader readerInstance = sentinel2ProductReaderPlugIn.createReaderInstance();
-        final Product product = readerInstance.readProductNodes(Jopenjpeg2LibraryTest.F, null);
+        final Product product = readerInstance.readProductNodes(Jopenjpeg2LibTest.F, null);
         assertNotNull(product);
         assertEquals(10960, product.getSceneRasterWidth());
         assertEquals(10960, product.getSceneRasterHeight());

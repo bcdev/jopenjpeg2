@@ -8,10 +8,10 @@ import com.sun.jna.*;
  * a tool written by <a href="http://ochafik.com/">Olivier Chafik</a> that <a href="http://code.google.com/p/jnaerator/wiki/CreditsAndLicense">uses a few opensource projects.</a>.<br>
  * For help, please visit <a href="http://nativelibs4java.googlecode.com/">NativeLibs4Java</a> , <a href="http://rococoa.dev.java.net/">Rococoa</a>, or <a href="http://jna.dev.java.net/">JNA</a>.
  */
-public interface Jopenjpeg2Library extends Library {
+public interface Jopenjpeg2Lib extends Library {
     public static final String JNA_LIBRARY_NAME = "jopenjpeg2";
 //    public static final NativeLibrary JNA_NATIVE_LIB = NativeLibrary.getInstance(Jopenjpeg2Library.JNA_LIBRARY_NAME);
-    public static final Jopenjpeg2Library INSTANCE = (Jopenjpeg2Library) Native.loadLibrary(Jopenjpeg2Library.JNA_LIBRARY_NAME, Jopenjpeg2Library.class);
+    public static final Jopenjpeg2Lib INSTANCE = (Jopenjpeg2Lib) Native.loadLibrary(Jopenjpeg2Lib.JNA_LIBRARY_NAME, Jopenjpeg2Lib.class);
 
     boolean jopj_read_img_region_data(String filepath, int resolution, int comp_index, int x0, int y0, int w, int h, short[] tile_data);
 

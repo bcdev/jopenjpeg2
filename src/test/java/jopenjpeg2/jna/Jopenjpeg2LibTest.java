@@ -1,8 +1,5 @@
 package jopenjpeg2.jna;
 
-import jopenjpeg2.jna.Jopenjpeg2Library;
-import jopenjpeg2.jna.jopj_Img;
-import jopenjpeg2.jna.jopj_ImgInfo;
 import org.junit.Test;
 
 import java.io.*;
@@ -13,14 +10,14 @@ import static org.junit.Assert.assertNotNull;
 /**
  * @author Norman Fomferra
  */
-public class Jopenjpeg2LibraryTest {
+public class Jopenjpeg2LibTest {
     // On Norman's notebook -Dsentinel2.testdataset=C:\Users\Norman\BC\EOData\S2_Simulated_Test_Data
     public static final File F = new File(System.getProperty("sentinel2.testdataset"),
             "IMG_GPPL1C_054_20091210235100_20091210235130_01_000000_15SVD.jp2");
 
     //@Test
     public void testDecodeRegion() throws Exception {
-        Jopenjpeg2Library lib = Jopenjpeg2Library.INSTANCE;
+        Jopenjpeg2Lib lib = Jopenjpeg2Lib.INSTANCE;
         jopj_Img img = lib.jopj_open_img(F.getPath(), 0);
         assertNotNull(img);
         jopj_ImgInfo img_info = lib.jopj_get_img_info(img);
@@ -76,7 +73,7 @@ public class Jopenjpeg2LibraryTest {
     }
 
     private void testDecodeTile(int res) throws IOException {
-        Jopenjpeg2Library lib = Jopenjpeg2Library.INSTANCE;
+        Jopenjpeg2Lib lib = Jopenjpeg2Lib.INSTANCE;
         jopj_Img img = lib.jopj_open_img(F.getPath(), res);
         assertNotNull(img);
         jopj_ImgInfo img_info = lib.jopj_get_img_info(img);

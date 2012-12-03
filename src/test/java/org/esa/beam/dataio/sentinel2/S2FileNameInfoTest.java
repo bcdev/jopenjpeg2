@@ -14,15 +14,15 @@ public class S2FileNameInfoTest {
     @Test
     public void testValidFileName() throws Exception {
 
-        final S2FileNameInfo fni = S2FileNameInfo.create("IMG_GPPL1C_054_20091210235100_20091210235130_01_000000_15TVE.jp2");
+        final S2FilenameInfoX fni = S2FilenameInfoX.create("IMG_GPPL1C_054_20091210235100_20091210235130_01_000000_15TVE.jp2");
 
         assertNotNull(fni);
-        assertEquals("L1C",fni.type);
-        assertEquals("054",fni.orbit);
+        assertEquals("L1C",fni.procLevel);
+        assertEquals("054",fni.orbitNo);
         assertEquals("20091210235100", fni.start);
         assertEquals("20091210235130", fni.stop);
         assertEquals("01", fni.band);
-        assertEquals("15TVE", fni.utmId);
+        assertEquals("15TVE", fni.tileId);
 
         assertEquals(1, fni.getBand());
         assertEquals(5, fni.getBand("IMG_GPPL1C_054_20091210235100_20091210235130_05_000000_15TVE.jp2"));
@@ -32,7 +32,7 @@ public class S2FileNameInfoTest {
 
     @Test
     public void testInvalidFileName() throws Exception {
-        assertNull(S2FileNameInfo.create("MTD_GPPL1C_054_20091210235100_20091210235130_0001.xml"));
-        assertNull(S2FileNameInfo.create("TBN_GPPL1C_054_20091210235100_20091210235130_000000_15SUD.jpg"));
+        assertNull(S2FilenameInfoX.create("MTD_GPPL1C_054_20091210235100_20091210235130_0001.xml"));
+        assertNull(S2FilenameInfoX.create("TBN_GPPL1C_054_20091210235100_20091210235130_000000_15SUD.jpg"));
     }
 }

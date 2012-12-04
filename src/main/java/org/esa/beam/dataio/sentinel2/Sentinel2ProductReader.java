@@ -37,20 +37,21 @@ import java.util.Map;
 public class Sentinel2ProductReader extends AbstractProductReader {
 
     S2WavebandInfo[] WAVEBAND_INFOS = new S2WavebandInfo[]{
-            new S2WavebandInfo("1", 443, 20, 60),
-            new S2WavebandInfo("2", 490, 65, 10),
-            new S2WavebandInfo("3", 560, 35, 10),
-            new S2WavebandInfo("4", 665, 30, 10),
-            new S2WavebandInfo("5", 705, 15, 20),
-            new S2WavebandInfo("6", 740, 15, 20),
-            new S2WavebandInfo("7", 775, 20, 20),
-            new S2WavebandInfo("8", 842, 115, 10),
-            new S2WavebandInfo("8a", 865, 20, 20),
-            new S2WavebandInfo("9", 940, 20, 60),
-            new S2WavebandInfo("10", 1380, 30, 60),
-            new S2WavebandInfo("11", 1610, 90, 20),
-            new S2WavebandInfo("12", 2190, 180, 20),
+            new S2WavebandInfo(0, "B1", 443, 20, S2Resolution.R60M),
+            new S2WavebandInfo(1, "B2", 490, 65, S2Resolution.R10M),
+            new S2WavebandInfo(2, "B3", 560, 35, S2Resolution.R10M),
+            new S2WavebandInfo(3, "B4", 665, 30, S2Resolution.R10M),
+            new S2WavebandInfo(4, "B5", 705, 15, S2Resolution.R20M),
+            new S2WavebandInfo(5, "B6", 740, 15, S2Resolution.R20M),
+            new S2WavebandInfo(6, "B7", 775, 20, S2Resolution.R20M),
+            new S2WavebandInfo(7, "B8", 842, 115, S2Resolution.R10M),
+            new S2WavebandInfo(8, "B8a", 865, 20, S2Resolution.R20M),
+            new S2WavebandInfo(9, "B9", 940, 20, S2Resolution.R60M),
+            new S2WavebandInfo(10, "B10", 1380, 30, S2Resolution.R60M),
+            new S2WavebandInfo(11, "B11", 1610, 90, S2Resolution.R20M),
+            new S2WavebandInfo(12, "B12", 2190, 180, S2Resolution.R20M),
     };
+
 
     Sentinel2ProductReader(Sentinel2ProductReaderPlugIn readerPlugIn) {
         super(readerPlugIn);
@@ -78,7 +79,7 @@ public class Sentinel2ProductReader extends AbstractProductReader {
         final File file0 = new File(s);
         final File dir = file0.getParentFile();
 
-        final S2FilenameInfoX fni0 = S2FilenameInfoX.create(file0.getName());
+        final S2FilenameInfo fni0 = S2FilenameInfo.create(file0.getName());
         if (fni0 == null) {
             throw new IOException();
         }
@@ -94,7 +95,7 @@ public class Sentinel2ProductReader extends AbstractProductReader {
             if (files != null) {
                 for (File file : files) {
                     int bandIndex = fni0.getBand(file.getName());
-                    if (bandIndex >= 0) {
+                    if (bandIndex >= 0 && bandIndex < WAVEBAND_INFOS.length) {
                         try {
                             Jp2Image.Layout imageLayout = jp2ImageFactory.getLayout(file);
                             BandInfo bandInfo = new BandInfo();

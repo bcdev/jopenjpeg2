@@ -18,27 +18,28 @@ public class Sentinel2ProductReaderPlugIn implements ProductReaderPlugIn {
 
     @Override
     public DecodeQualification getDecodeQualification(Object input) {
-        return input.toString().endsWith(JP2_EXT) ? DecodeQualification.SUITABLE :  DecodeQualification.UNABLE;
+        return input.toString().endsWith(JP2_EXT) ? DecodeQualification.SUITABLE : DecodeQualification.UNABLE;
     }
 
     @Override
     public Class[] getInputTypes() {
-        return new Class[] {String.class, File.class};
+        return new Class[]{String.class, File.class};
     }
 
     @Override
     public ProductReader createReaderInstance() {
-        return new Sentinel2ProductReader(this);
+        // return new Sentinel2ProductReader(this);
+        return new Sentinel2ProductReader2(this);
     }
 
     @Override
     public String[] getFormatNames() {
-        return new String[] {FORMAT_NAME};
+        return new String[]{FORMAT_NAME};
     }
 
     @Override
     public String[] getDefaultFileExtensions() {
-        return new String[] {JP2_EXT};
+        return new String[]{JP2_EXT};
     }
 
     @Override

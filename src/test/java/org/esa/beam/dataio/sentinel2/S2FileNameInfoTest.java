@@ -14,7 +14,7 @@ public class S2FileNameInfoTest {
     @Test
     public void testValidFileName() throws Exception {
 
-        final S2FilenameInfoX fni = S2FilenameInfoX.create("IMG_GPPL1C_054_20091210235100_20091210235130_01_000000_15TVE.jp2");
+        final S2FilenameInfo fni = S2FilenameInfo.create("IMG_GPPL1C_054_20091210235100_20091210235130_01_000000_15TVE.jp2");
 
         assertNotNull(fni);
         assertEquals("L1C",fni.procLevel);
@@ -32,7 +32,7 @@ public class S2FileNameInfoTest {
 
     @Test
     public void testInvalidFileName() throws Exception {
-        assertNull(S2FilenameInfoX.create("MTD_GPPL1C_054_20091210235100_20091210235130_0001.xml"));
-        assertNull(S2FilenameInfoX.create("TBN_GPPL1C_054_20091210235100_20091210235130_000000_15SUD.jpg"));
+        assertNull(S2FilenameInfo.create("MTD_GPPL1C_054_20091210235100_20091210235130_0001.xml"));
+        assertNull(S2FilenameInfo.create("TBN_GPPL1C_054_20091210235100_20091210235130_000000_15SUD.jpg"));
     }
 }

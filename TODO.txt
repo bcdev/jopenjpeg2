@@ -1,0 +1,6 @@
+org.esa.beam.jai.ImageManager.getMultiLevelModel():
+
+For VirtualBands (or any bands that don't have a source image set yet), a new max. resolution level will be computed
+from image size.
+However, the max.resolution level SHALL be computed from source bands used by a VirtualImage. Background: source
+images might read data from disk and this rules the max. resolution level (e.g. Sentinel-2 JPEG 2000 images)

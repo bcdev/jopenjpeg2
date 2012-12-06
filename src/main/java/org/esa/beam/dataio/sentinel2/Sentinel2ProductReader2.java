@@ -7,26 +7,25 @@ import com.bc.ceres.glevel.support.DefaultMultiLevelImage;
 import com.bc.ceres.glevel.support.DefaultMultiLevelModel;
 import org.esa.beam.framework.dataio.AbstractProductReader;
 import org.esa.beam.framework.datamodel.Band;
+import org.esa.beam.framework.datamodel.CrsGeoCoding;
 import org.esa.beam.framework.datamodel.Product;
 import org.esa.beam.framework.datamodel.ProductData;
 import org.esa.beam.jai.ResolutionLevel;
 import org.esa.beam.jai.SingleBandedOpImage;
 import org.esa.beam.util.SystemUtils;
 import org.esa.beam.util.io.FileUtils;
+import org.esa.beam.util.logging.BeamLogManager;
+import org.geotools.geometry.Envelope2D;
+import org.jdom.JDOMException;
+import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.operation.TransformException;
 
 import javax.imageio.stream.FileImageInputStream;
 import javax.imageio.stream.ImageInputStream;
-import javax.media.jai.BorderExtender;
-import javax.media.jai.ImageLayout;
-import javax.media.jai.Interpolation;
-import javax.media.jai.JAI;
-import javax.media.jai.PlanarImage;
-import javax.media.jai.RenderedOp;
+import javax.media.jai.*;
 import javax.media.jai.operator.CropDescriptor;
 import javax.media.jai.operator.ScaleDescriptor;
-import java.awt.Dimension;
-import java.awt.Rectangle;
-import java.awt.RenderingHints;
+import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferUShort;
@@ -37,11 +36,7 @@ import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class Sentinel2ProductReader2 extends AbstractProductReader {
     private static final int DEFAULT_TILE_SIZE = 512;
@@ -125,7 +120,7 @@ public class Sentinel2ProductReader2 extends AbstractProductReader {
         if (fni0 == null) {
             throw new IOException();
         }
-
+        Header metadataHeader = null;
         final Map<Integer, BandInfo> fileMap = new HashMap<Integer, BandInfo>();
         if (dir != null) {
             File[] files = dir.listFiles(new FilenameFilter() {
@@ -147,6 +142,22 @@ public class Sentinel2ProductReader2 extends AbstractProductReader {
                     }
                 }
             }
+            File[] metadataFiles = dir.listFiles(new FilenameFilter() {
+                @Override
+                public boolean accept(File dir, String name) {
+                    return name.startsWith("MTD_") && name.endsWith(".xml");
+                }
+            });
+            if (metadataFiles != null && metadataFiles.length > 0) {
+                File metadataFile = metadataFiles[0];
+                try {
+                    metadataHeader = Header.parseHeader(metadataFile);
+                } catch (JDOMException e) {
+                    BeamLogManager.getSystemLogger().warning("Failed to parse metadata file: " + metadataFile);
+                }
+            } else {
+                BeamLogManager.getSystemLogger().warning("No metadata file found");
+            }
         }
 
         final ArrayList<Integer> bandIndexes = new ArrayList<Integer>(fileMap.keySet());
@@ -156,7 +167,9 @@ public class Sentinel2ProductReader2 extends AbstractProductReader {
             throw new IOException("No valid bands found.");
         }
 
-        final Product product = new Product(dir != null ? dir.getName() : "S2L1C", "S2L1C",
+        String prodType = "S2_MSI_" + fni0.procLevel;
+        final Product product = new Product(String.format("%s_%s_%s", prodType, fni0.orbitNo, fni0.tileId),
+                                            prodType,
                                             imageLayouts[S2Resolution.R10M.id].width,
                                             imageLayouts[S2Resolution.R10M.id].height);
 
@@ -172,6 +185,28 @@ public class Sentinel2ProductReader2 extends AbstractProductReader {
             // warn
         }
 
+        if (metadataHeader != null) {
+            SceneDescription sceneDescription = SceneDescription.create(metadataHeader);
+            int tileIndex = sceneDescription.getTileIndex(fni0.tileId);
+            Envelope2D tileEnvelope = sceneDescription.getTileEnvelope(tileIndex);
+            Header.Tile tile = metadataHeader.getTileList().get(tileIndex);
+
+            try {
+                product.setGeoCoding(new CrsGeoCoding(tileEnvelope.getCoordinateReferenceSystem(),
+                                                      imageLayouts[S2Resolution.R10M.id].width,
+                                                      imageLayouts[S2Resolution.R10M.id].height,
+                                                      tile.tileGeometry10M.upperLeftX,
+                                                      tile.tileGeometry10M.upperLeftY,
+                                                      tile.tileGeometry10M.xDim,
+                                                      -tile.tileGeometry10M.yDim,
+                                                      0.0, 0.0));
+            } catch (FactoryException e) {
+                // todo - handle e
+            } catch (TransformException e) {
+                // todo - handle e
+            }
+        }
+
         for (Integer bandIndex : bandIndexes) {
             final BandInfo bandInfo = fileMap.get(bandIndex);
             final Band band = product.addBand(bandInfo.wavebandInfo.bandName, ProductData.TYPE_UINT16);
@@ -180,6 +215,8 @@ public class Sentinel2ProductReader2 extends AbstractProductReader {
             band.setSpectralBandIndex(bandIndex);
             band.setSourceImage(new DefaultMultiLevelImage(new Jp2MultiLevelSource(bandInfo)));
         }
+
+        product.setNumResolutionLevels(imageLayouts[0].numResolutions);
 
         return product;
     }
@@ -224,6 +261,10 @@ public class Sentinel2ProductReader2 extends AbstractProductReader {
     }
 
     private class Jp2MultiLevelSource extends AbstractMultiLevelSource {
+        public static final float R20M_X_FACTOR = 1.0252F;
+        public static final float R20M_Y_FACTOR = 1.0253F;
+        public static final float R60M_X_FACTOR = 1.02445F;
+        public static final float R60M_Y_FACTOR = 1.0249F;
         final BandInfo bandInfo;
 
         public Jp2MultiLevelSource(BandInfo bandInfo) {
@@ -236,7 +277,7 @@ public class Sentinel2ProductReader2 extends AbstractProductReader {
             try {
                 RenderedImage opImage = new Jp2ExeOpImage(bandInfo, getModel(), level);
                 if (bandInfo.wavebandInfo.resolution != S2Resolution.R10M) {
-                    return createScaledImage(opImage, level);
+                    return createScaledImage(opImage, bandInfo.wavebandInfo.resolution, level);
                 }
                 return opImage;
             } catch (IOException e) {
@@ -244,11 +285,15 @@ public class Sentinel2ProductReader2 extends AbstractProductReader {
             }
         }
 
-        private RenderedOp createScaledImage(RenderedImage sourceImage, int level) {
+        private RenderedOp createScaledImage(RenderedImage sourceImage, S2Resolution resolution, int level) {
+            int sourceWidth = sourceImage.getWidth();
+            int sourceHeight = sourceImage.getHeight();
             int targetWidth = imageLayouts[0].width >> level;
             int targetHeight = imageLayouts[0].height >> level;
-            float xScale = (float) targetWidth / (float) sourceImage.getWidth();
-            float yScale = (float) targetHeight / (float) sourceImage.getHeight();
+            float scaleX = (float) targetWidth / (float) sourceWidth;
+            float scaleY = (float) targetHeight / (float) sourceHeight;
+            float corrFactorX = resolution == S2Resolution.R20M ? R20M_X_FACTOR : R60M_X_FACTOR;
+            float corrFactorY = resolution == S2Resolution.R20M ? R20M_Y_FACTOR : R60M_Y_FACTOR;
             final Dimension tileDim = getTileDim(targetWidth, targetHeight);
             ImageLayout imageLayout = new ImageLayout();
             imageLayout.setTileWidth(tileDim.width);
@@ -257,7 +302,8 @@ public class Sentinel2ProductReader2 extends AbstractProductReader {
                                                                BorderExtender.createInstance(BorderExtender.BORDER_ZERO));
             renderingHints.put(JAI.KEY_IMAGE_LAYOUT, imageLayout);
             RenderedOp scaledImage = ScaleDescriptor.create(sourceImage,
-                                                            xScale, yScale,
+                                                            scaleX * corrFactorX,
+                                                            scaleY * corrFactorY,
                                                             0F, 0F,
                                                             Interpolation.getInstance(Interpolation.INTERP_NEAREST),
                                                             renderingHints);
